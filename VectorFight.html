@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Indo-Brawl: Modern India 2026</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Oswald', sans-serif; }
+        canvas { display: block; margin: 0 auto; background: #111; }
+        #game-ui {
+            position: absolute; top: 20px; width: 100%; display: flex; 
+            justify-content: space-around; color: #fff; font-size: 24px; pointer-events: none;
+        }
+        .health-box { width: 300px; height: 25px; background: #333; border: 2px solid #ff9933; border-radius: 5px; }
+        .health-fill { width: 100%; height: 100%; transition: width 0.3s ease; }
+        #game-over {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none; flex-direction: column;
+            align-items: center; justify-content: center; color: white; text-align: center;
+        }
+        .btn {
+            padding: 15px 40px; font-size: 20px; background: #138808; color: white;
+            border: none; cursor: pointer; margin-top: 20px; border-radius: 5px;
+        }
+        .btn:hover { background: #ff9933; }
+    </style>
+</head>
+<body>
+
+    <div id="game-ui">
+        <div>PLAYER<div class="health-box"><div id="p1-health" class="health-fill" style="background: #138808;"></div></div></div>
+        <div id="score-display">REWARDS: 0</div>
+        <div>AI BOT<div class="health-box"><div id="p2-health" class="health-fill" style="background: #ff9933;"></div></div></div>
+    </div>
+
+    <div id="game-over">
+        <h1 id="result-text" style="font-size: 60px;">GAME OVER</h1>
+        <p id="final-score" style="font-size: 24px;">Total Points Earned: 0</p>
+        <button class="btn" onclick="location.reload()">REMATCH</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 1024;
+canvas.height = 576;
+
+let score = 0;
+let gameOver = false;
+
+// 1. CHARACTER CLASS WITH ANIMATION SUPPORT
+class Human {
+    constructor({ position, velocity, color, isAI = false, sprites }) {
+        this.position = position;
+        this.velocity = velocity;
+        this.width = 80;
+        this.height = 160;
+        this.health = 100;
+        this.isAttacking = false;
+        this.isAI = isAI;
+        this.frame = 0;
+        this.frameTimer = 0;
+        
+        // Placeholder for real sprite sheets
+        this.image = new Image();
+        this.image.src = sprites; // Replace with real human sprite sheet URL
+    }
+
+    draw() {
+        // Drawing a "Realistic" shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(this.position.x + 40, canvas.height - 60, 40, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Realistic Human Representation (Simulated Sprite)
+        ctx.fillStyle = this.color; 
+        // Note: For real animation, use ctx.drawImage(this.image, sx, sy, sw, sh, x, y, w, h)
+        // Here we use a stylized human shape until you add your image URLs
+        ctx.fillStyle = this.isAI ? '#4facfe' : '#ff4b2b';
+        ctx.fillRect(this.position.x, this.position.y, this.width, this.height);
+        
+        // Arms (Attack Animation)
+        if (this.isAttacking) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(this.position.x + (this.isAI ? -40 : 80), this.position.y + 40, 40, 20);
+        }
+    }
+
+    update() {
+        if (gameOver) return;
+        this.draw();
+        this.position.x += this.velocity.x;
+        this.position.y += this.velocity.y;
+
+        // Gravity
+        if (this.position.y + this.height + this.velocity.y >= canvas.height - 60) {
+            this.velocity.y = 0;
+            this.position.y = canvas.height - 60 - this.height;
+        } else {
+            this.velocity.y += 0.7;
+        }
+    }
+
+    attack() {
+        this.isAttacking = true;
+        setTimeout(() => this.isAttacking = false, 150);
+    }
+}
+
+const player = new Human({ position: {x: 150, y: 0}, velocity: {x: 0, y: 0}, sprites: 'player_sheet.png' });
+const enemy = new Human({ position: {x: 800, y: 0}, velocity: {x: 0, y: 0}, isAI: true, sprites: 'ai_sheet.png' });
+
+// 2. MODERN INDIAN BACKGROUND (PARALLAX & 3D FEEL)
+function drawModernIndia() {
+    // Sky
+    let sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    sky.addColorStop(0, '#1a2a6c');
+    sky.addColorStop(1, '#b21f1f');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 3D Glass Buildings (Modern Bangalore/Mumbai vibe)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(200, 100, 150, 476);
+    ctx.fillRect(600, 50, 200, 526);
+
+    // Integration of "Shashwat" in the scenery
+    ctx.save();
+    ctx.font = '80px Impact';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillText("SHASHWAT", 300, 300);
+    ctx.restore();
+
+    // Floor
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+    ctx.fillStyle = '#138808'; // Indian Green accent
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 4);
+}
+
+function checkCollision(rect1, rect2) {
+    return (
+        rect1.isAttacking &&
+        rect1.position.x + (rect1.isAI ? -40 : 80) < rect2.position.x + rect2.width &&
+        rect1.position.x + (rect1.isAI ? 0 : 120) > rect2.position.x &&
+        rect1.position.y < rect2.position.y + rect2.height
+    )
+}
+
+function handleGameOver(winner) {
+    gameOver = true;
+    document.getElementById('game-over').style.display = 'flex';
+    document.getElementById('result-text').innerText = winner === 'player' ? "YOU WON!" : "AI OVERLORD WINS";
+    document.getElementById('final-score').innerText = `Rewards Collected: ${score}`;
+}
+
+function animate() {
+    if (gameOver) return;
+    window.requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawModernIndia();
+    player.update();
+    enemy.update();
+
+    // AI Logic
+    const dist = player.position.x - enemy.position.x;
+    enemy.velocity.x = dist > 50 ? 2 : dist < -50 ? -2 : 0;
+    if (Math.abs(dist) < 100 && Math.random() < 0.02) enemy.attack();
+
+    // Collision & Point Reward System
+    if (checkCollision(player, enemy)) {
+        player.isAttacking = false;
+        enemy.health -= 5;
+        score += 50; // Points per hit
+        document.getElementById('p2-health').style.width = enemy.health + '%';
+        document.getElementById('score-display').innerText = `REWARDS: ₹${score}`;
+    }
+    if (checkCollision(enemy, player)) {
+        enemy.isAttacking = false;
+        player.health -= 5;
+        document.getElementById('p1-health').style.width = player.health + '%';
+    }
+
+    if (enemy.health <= 0) handleGameOver('player');
+    if (player.health <= 0) handleGameOver('ai');
+}
+
+// Controls
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'd') player.velocity.x = 5;
+    if (e.key === 'a') player.velocity.x = -5;
+    if (e.key === 'w' && player.velocity.y === 0) player.velocity.y = -18;
+    if (e.key === ' ') player.attack();
+});
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'd' || e.key === 'a') player.velocity.x = 0;
+});
+
+animate();
+</script>
+</body>
+</html>
